@@ -1,0 +1,49 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the asc compiler CLI binary
+    cmds:
+      - go build -o asc.exe ./cmd/asc
+
+  test:unit:
+    desc: Run unit tests for parser and guardian
+    cmds:
+      - go test -v ./compiler/parser ./compiler/guardian
+
+  test:go:
+    desc: Run Go E2E integration and comparative benchmark tests
+    cmds:
+      - go test -v github.com/snowmerak/antiserial/test
+
+  test:rust:
+    desc: Run Rust E2E verification test
+    dir: test/test_rust
+    cmds:
+      - cargo run
+
+  test:ts:
+    desc: Run TypeScript E2E verification test via Deno
+    cmds:
+      - deno run test/test_ts/test.ts
+
+  test:py:
+    desc: Run Python E2E verification test
+    cmds:
+      - python test/test_py/test.py
+
+  test:all:
+    desc: Run all unit and E2E multi-language verification tests
+    cmds:
+      - task: build
+      - task: test:unit
+      - task: test:go
+      - task: test:rust
+      - task: test:ts
+      - task: test:py
+
+  bench:
+    desc: Run comparative serialization benchmarks
+    dir: test
+    cmds:
+      - go test -bench=Benchmark

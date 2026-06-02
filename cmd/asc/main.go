@@ -10,7 +10,9 @@ import (
 
 	"github.com/snowmerak/antiserial/compiler/codegen/cpp"
 	"github.com/snowmerak/antiserial/compiler/codegen/golang"
+	"github.com/snowmerak/antiserial/compiler/codegen/python"
 	"github.com/snowmerak/antiserial/compiler/codegen/rust"
+	"github.com/snowmerak/antiserial/compiler/codegen/typescript"
 	"github.com/snowmerak/antiserial/compiler/guardian"
 	"github.com/snowmerak/antiserial/compiler/parser"
 )
@@ -20,6 +22,8 @@ func main() {
 	goOut := flag.String("go_out", "", "Directory path for generated Go source code")
 	rustOut := flag.String("rust_out", "", "Directory path for generated Rust source code")
 	cppOut := flag.String("cpp_out", "", "Directory path for generated C++ header source code")
+	tsOut := flag.String("ts_out", "", "Directory path for generated TypeScript source code")
+	pyOut := flag.String("py_out", "", "Directory path for generated Python source code")
 	baseSchema := flag.String("base_schema", "", "Path to the base schema file for backward compatibility validation")
 	validateOnly := flag.Bool("validate_only", false, "Perform validation only, do not generate source code")
 
@@ -151,5 +155,45 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("C++ code generated successfully: %s\n", outFilePath)
+	}
+
+	if *tsOut != "" {
+		if err := os.MkdirAll(*tsOut, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating TypeScript output directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		generatedTs, err := typescript.Generate(currentAST)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "TypeScript Code Generation failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		outFilePath := filepath.Join(*tsOut, rawName+".ts")
+		if err := os.WriteFile(outFilePath, []byte(generatedTs), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing TypeScript output file %s: %v\n", outFilePath, err)
+			os.Exit(1)
+		}
+		fmt.Printf("TypeScript code generated successfully: %s\n", outFilePath)
+	}
+
+	if *pyOut != "" {
+		if err := os.MkdirAll(*pyOut, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating Python output directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		generatedPy, err := python.Generate(currentAST)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Python Code Generation failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		outFilePath := filepath.Join(*pyOut, rawName+".py")
+		if err := os.WriteFile(outFilePath, []byte(generatedPy), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Python output file %s: %v\n", outFilePath, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Python code generated successfully: %s\n", outFilePath)
 	}
 }

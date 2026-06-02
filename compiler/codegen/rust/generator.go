@@ -82,7 +82,11 @@ use std::convert::TryInto;
 		buf.WriteString("    }\n")
 
 		// Deserialize Method
-		buf.WriteString(fmt.Sprintf("    pub fn deserialize(buf: &'a [u8], offset: &mut usize) -> Result<Self, &'static str> {\n"))
+		methodLifetime := ""
+		if !structLifetimes[s.Name] {
+			methodLifetime = "<'a>"
+		}
+		buf.WriteString(fmt.Sprintf("    pub fn deserialize%s(buf: &'a [u8], offset: &mut usize) -> Result<Self, &'static str> {\n", methodLifetime))
 		buf.WriteString(`        let bitmap_start = *offset;
         loop {
             if *offset >= buf.len() {
@@ -321,7 +325,7 @@ func genDeserializeType(t ast.FieldType, expr string, structLifetimes map[string
 		return fmt.Sprintf(`%s = %s::deserialize(buf, offset)?;`, expr, t.Name)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
-		elemTypeStr := toRustType(*t.ElemType, structLifetimes)
+		elemDefault := defaultRustValue(*t.ElemType, structLifetimes)
 		elemCode := genDeserializeType(*t.ElemType, elemName, structLifetimes, depth+1)
 		return fmt.Sprintf(`if *offset + 2 > buf.len() {
     return Err("Unexpected EOF");
@@ -331,17 +335,17 @@ func genDeserializeType(t ast.FieldType, expr string, structLifetimes map[string
     *offset += 2;
     let mut vec = Vec::with_capacity(count);
     for _ in 0..count {
-        let mut %s = %s::default();
+        let mut %s = %s;
 %s
         vec.push(%s);
     }
     %s = vec;
-}`, elemName, elemTypeStr, indent(elemCode, "        "), elemName, expr)
+}`, elemName, elemDefault, indent(elemCode, "        "), elemName, expr)
 	case ast.TypeMap:
 		keyName := fmt.Sprintf("k%d", depth)
 		valName := fmt.Sprintf("v%d", depth)
-		keyTypeStr := toRustType(*t.KeyType, structLifetimes)
-		valTypeStr := toRustType(*t.ValType, structLifetimes)
+		keyDefault := defaultRustValue(*t.KeyType, structLifetimes)
+		valDefault := defaultRustValue(*t.ValType, structLifetimes)
 		keyCode := genDeserializeType(*t.KeyType, keyName, structLifetimes, depth+1)
 		valCode := genDeserializeType(*t.ValType, valName, structLifetimes, depth+1)
 		return fmt.Sprintf(`if *offset + 2 > buf.len() {
@@ -352,16 +356,42 @@ func genDeserializeType(t ast.FieldType, expr string, structLifetimes map[string
     *offset += 2;
     let mut map = std::collections::HashMap::with_capacity(count);
     for _ in 0..count {
-        let mut %s = %s::default();
+        let mut %s = %s;
 %s
-        let mut %s = %s::default();
+        let mut %s = %s;
 %s
         map.insert(%s, %s);
     }
     %s = map;
-}`, keyName, keyTypeStr, indent(keyCode, "        "), valName, valTypeStr, indent(valCode, "        "), keyName, valName, expr)
+}`, keyName, keyDefault, indent(keyCode, "        "), valName, valDefault, indent(valCode, "        "), keyName, valName, expr)
 	}
 	return ""
+}
+
+// defaultRustValue returns the default initializer expression for Rust variables.
+func defaultRustValue(t ast.FieldType, structLifetimes map[string]bool) string {
+	switch t.Kind {
+	case ast.TypePrimitive:
+		switch t.Name {
+		case "bool":
+			return "false"
+		case "int32", "uint32", "int64", "uint64":
+			return "0"
+		case "float32", "float", "float64", "double":
+			return "0.0"
+		case "string":
+			return `""`
+		case "bytes":
+			return "&[]"
+		}
+	case ast.TypeStruct:
+		return fmt.Sprintf("%s::default()", t.Name)
+	case ast.TypeList:
+		return "Vec::new()"
+	case ast.TypeMap:
+		return "std::collections::HashMap::new()"
+	}
+	return "Default::default()"
 }
 
 // indent prefixes each line of s with prefix.

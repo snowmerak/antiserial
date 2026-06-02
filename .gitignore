@@ -1,0 +1,4 @@
+asc.exe
+test/test_rust/target/
+__pycache__/
+*.pyc
