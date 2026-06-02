@@ -86,3 +86,54 @@ func TestGoldenPayloadV2TypeScriptDecode(t *testing.T) {
 		t.Fatalf("deno verify: %v\n%s", err, out)
 	}
 }
+
+func findCppTestBinary(buildDir string) string {
+	candidates := []string{
+		filepath.Join(buildDir, "test_cpp"),
+		filepath.Join(buildDir, "test_cpp.exe"),
+		filepath.Join(buildDir, "Release", "test_cpp.exe"),
+		filepath.Join(buildDir, "Debug", "test_cpp.exe"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+func buildCppTestBinary(t *testing.T) string {
+	t.Helper()
+	_, file, _, _ := runtime.Caller(0)
+	testDir := filepath.Dir(file)
+	cppDir := filepath.Join(testDir, "test_cpp")
+	buildDir := filepath.Join(cppDir, "build")
+
+	if exe := findCppTestBinary(buildDir); exe != "" {
+		return exe
+	}
+
+	cfg := exec.Command("cmake", "-S", cppDir, "-B", buildDir, "-DCMAKE_BUILD_TYPE=Release")
+	if out, err := cfg.CombinedOutput(); err != nil {
+		t.Fatalf("cmake configure: %v\n%s", err, out)
+	}
+	bld := exec.Command("cmake", "--build", buildDir, "--config", "Release")
+	if out, err := bld.CombinedOutput(); err != nil {
+		t.Fatalf("cmake build: %v\n%s", err, out)
+	}
+	if exe := findCppTestBinary(buildDir); exe != "" {
+		return exe
+	}
+	t.Fatal("C++ test binary not found after build")
+	return ""
+}
+
+func TestGoldenPayloadV2CppDecode(t *testing.T) {
+	goldenPath := goldenPayloadV2Path(t)
+	exe := buildCppTestBinary(t)
+	cmd := exec.Command(exe, goldenPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("cpp verify: %v\n%s", err, out)
+	}
+}

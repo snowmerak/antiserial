@@ -18,6 +18,7 @@ tasks:
       - ./asc.exe --py_out=test/test_py test/schema_v2.as
       - ./asc.exe --py_out=test/test_py test/schema_nested.as
       - ./asc.exe --ts_out=test/test_ts test/schema_v2.as
+      - ./asc.exe --cpp_out=test/test_cpp/gen test/schema_v2.as
 
   test:unit:
     desc: Run unit tests for parser and guardian
@@ -29,7 +30,7 @@ tasks:
     cmds:
       - go test -v github.com/snowmerak/antiserial/test
   test:golden:
-    desc: Run cross-language golden wire decode tests (Go, Python, Rust, Deno)
+    desc: Run cross-language golden wire decode tests (Go, Python, Rust, Deno, C++)
     cmds:
       - go test -v github.com/snowmerak/antiserial/test -run TestGolden
 
@@ -52,6 +53,14 @@ tasks:
       - python test/test_py/test_limits.py
       - python test/test_py/test_nested.py
 
+  test:cpp:
+    desc: Run C++ E2E verification tests (CMake build + ctest)
+    dir: test/test_cpp
+    cmds:
+      - cmake -S . -B build
+      - cmake --build build --config Release
+      - ctest --test-dir build -C Release --output-on-failure
+
   test:all:
     desc: Run all unit and E2E multi-language verification tests
     cmds:
@@ -61,6 +70,7 @@ tasks:
       - task: test:rust
       - task: test:ts
       - task: test:py
+      - task: test:cpp
 
   bench:
     desc: Run comparative serialization benchmarks

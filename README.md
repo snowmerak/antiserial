@@ -153,10 +153,11 @@ task build          # asc.exe
 task codegen        # refresh test/testgen_* and language fixtures from .as files
 task test:unit      # parser + guardian
 task test:go        # Go integration, limits, nested struct, optional, zero-copy
-task test:golden    # same bytes decoded by Go, Python, Rust, TypeScript
+task test:golden    # same bytes decoded by Go, Python, Rust, TypeScript, C++
 task test:rust      # Rust wire-format E2E (cargo run)
 task test:ts        # Deno: test.ts + test_limits.ts
 task test:py        # Python: test.py + test_limits.py + test_nested.py
+task test:cpp       # C++ wire-format E2E (CMake + ctest; requires a C++17 toolchain)
 task bench          # comparative benchmarks (in test/)
 ```
 
@@ -170,7 +171,7 @@ go test -bench=Benchmark ./test/
 
 After changing `.as` schemas or codegen, run `task codegen` before committing generated sources under `test/`.
 
-Cross-language wire compatibility is checked against `test/golden/payload_v2.bin`: Go marshaling must match the file, and Python/Rust/TypeScript decoders must read the same bytes to identical field values.
+Cross-language wire compatibility is checked against `test/golden/payload_v2.bin`: Go marshaling must match the file, and Python/Rust/TypeScript/C++ decoders must read the same bytes to identical field values.
 
 ### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers vs Apache Fory vs MessagePack vs Sonic)
 
