@@ -104,14 +104,19 @@ go test ./test/...
 go test -bench=Benchmark ./test/
 ```
 
-### Benchmark Comparison (AntiSerial vs JSON)
+### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers)
 
 Benchmarks executed on Go 1.20+, arm64 system showing direct comparative performance:
 
 * **Marshal Performance**:
-  * **AntiSerial Marshal**: **17.96 ns/op** | **0 B/op** | **0 allocs/op** (15.5x faster than JSON)
-  * **JSON Marshal**: **279.30 ns/op** | **80 B/op** | **1 allocs/op**
+  * **AntiSerial Marshal**: **18.54 ns/op** | **0 B/op** | **0 allocs/op** (10.0x faster than Protobuf, 11.2x faster than FlatBuffers, 15.2x faster than JSON)
+  * **Protobuf Marshal**: **185.20 ns/op** | **24 B/op** | **1 allocs/op**
+  * **FlatBuffers Marshal**: **207.40 ns/op** | **8 B/op** | **1 allocs/op**
+  * **JSON Marshal**: **282.60 ns/op** | **80 B/op** | **1 allocs/op**
 * **Unmarshal Performance**:
-  * **AntiSerial Unmarshal**: **44.23 ns/op** | **32 B/op** | **1 allocs/op** (30.2x faster than JSON)
-  * **JSON Unmarshal**: **1337.00 ns/op** | **248 B/op** | **8 allocs/op**
+  * **AntiSerial Unmarshal**: **45.99 ns/op** | **32 B/op** | **1 allocs/op** (5.5x faster than Protobuf, 1.1x faster than FlatBuffers, 28.6x faster than JSON)
+  * **FlatBuffers Unmarshal**: **50.03 ns/op** | **0 B/op** | **0 allocs/op**
+  * **Protobuf Unmarshal**: **254.40 ns/op** | **60 B/op** | **5 allocs/op**
+  * **JSON Unmarshal**: **1315.00 ns/op** | **248 B/op** | **8 allocs/op**
+
 

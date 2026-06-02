@@ -1,0 +1,10 @@
+namespace fbs;
+
+table Payload {
+  id:long;
+  uuid:string;
+  active:bool;
+  tags:[string];
+}
+
+root_type Payload;
