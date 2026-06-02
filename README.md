@@ -2,7 +2,7 @@
 
 AntiSerial (As) is a compile-time static, tagless binary serialization protocol designed for zero-allocation memory operations, optimized binary size, and high-performance serialization/deserialization. 
 
-This repository implements the AntiSerial compiler (`asc`), a schema compatibility validator (Schema Guardian), and code generation engines for Go, Rust, and C++.
+This repository implements the AntiSerial compiler (`asc`), a schema compatibility validator (Schema Guardian), and code generation engines for Go, Rust, C++, TypeScript, and Python.
 
 ---
 
@@ -11,7 +11,7 @@ This repository implements the AntiSerial compiler (`asc`), a schema compatibili
 1. **Tagless Serialization**: No individual field numbers or metadata tags are recorded in the stream. Fields are sequentially serialized based on a statically agreed compile-time order.
 2. **Centralized Varint-like Bitmap Header**: A compact header at the beginning of the payload uses continuation bits (MSB) to record the presence of fields. Primitives and collections that are omitted (null or default-valued) consume 0 bytes of payload.
 3. **No Memory Padding**: All fields are packed tightly without padding bytes, ensuring the smallest possible wire size.
-4. **Zero-Copy Projection**: Deserialization maps variable-length fields (strings and byte slices) directly to input buffer pointers (e.g., `unsafe.String` in Go, references with lifetime `'a` in Rust, `std::string_view` / `std::span` in C++) avoiding heap allocations.
+4. **Zero-Copy Projection**: Deserialization maps variable-length fields (strings and byte slices) directly to input buffer pointers (e.g., `unsafe.String` in Go, references with lifetime `'a` in Rust, `std::string_view` / `std::span` in C++, `Uint8Array` subarrays in TypeScript, and `memoryview` projections in Python) avoiding intermediate heap allocations.
 5. **Strict Backward Compatibility**: New fields can only be appended to the end of a struct (Append-Only rule). Older clients can safely decode upgraded payloads by parsing known fields and exiting early (End-of-Stream Cut-off), ignoring any trailing unknown fields.
 
 ---
@@ -75,6 +75,8 @@ Options:
   --go_out=<dir>         Directory for generated Go source code
   --rust_out=<dir>       Directory for generated Rust source code
   --cpp_out=<dir>        Directory for generated C++ header source code
+  --ts_out=<dir>         Directory for generated TypeScript source code
+  --py_out=<dir>         Directory for generated Python source code
   --base_schema=<file>   Path to the base schema file to validate backward compatibility
   --validate_only        Perform validation only without generating code
 ```
