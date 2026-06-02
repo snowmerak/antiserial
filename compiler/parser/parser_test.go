@@ -66,6 +66,26 @@ func TestParseUndefinedType(t *testing.T) {
 	}
 }
 
+func TestParseOptionalField(t *testing.T) {
+	src := `
+	struct Payload {
+		id: int64;
+		score: optional int32;
+	}
+	`
+	astVal, err := NewParser(src).Parse()
+	if err != nil {
+		t.Fatalf("parse optional: %v", err)
+	}
+	payload, ok := astVal.FindStruct("Payload")
+	if !ok || len(payload.Fields) != 2 {
+		t.Fatalf("unexpected struct: %+v", payload)
+	}
+	if !payload.Fields[1].Type.Optional || payload.Fields[1].Type.Name != "int32" {
+		t.Fatalf("score field type: %+v", payload.Fields[1].Type)
+	}
+}
+
 func TestParseDuplicateField(t *testing.T) {
 	src := `
 	struct Point {

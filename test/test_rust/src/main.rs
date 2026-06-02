@@ -1,8 +1,27 @@
 mod schema_v2;
 
 use schema_v2::Payload;
+use std::env;
+use std::fs;
 
-fn main() -> Result<(), &'static str> {
+fn verify_golden(path: &str) -> Result<(), &'static str> {
+    let data = fs::read(path).map_err(|_| "failed to read golden file")?;
+    let mut offset = 0;
+    let decoded = Payload::deserialize(&data, &mut offset)?;
+    if offset != data.len() {
+        return Err("did not consume full buffer");
+    }
+    if decoded.id != 1234567890 || decoded.uuid != "abc" || !decoded.active {
+        return Err("field mismatch");
+    }
+    if decoded.tags.len() != 2 || decoded.tags[0] != "go" || decoded.tags[1] != "rust" {
+        return Err("tags mismatch");
+    }
+    println!("Rust golden verify: PASSED");
+    Ok(())
+}
+
+fn e2e_roundtrip() -> Result<(), &'static str> {
     let mut p = Payload::default();
     p.id = 1234567890;
     p.uuid = "abc";
@@ -13,13 +32,13 @@ fn main() -> Result<(), &'static str> {
     p.serialize(&mut serialized)?;
 
     let expected_bytes = vec![
-        0x0F,                                           // Bitmap
-        0xD2, 0x02, 0x96, 0x49, 0x00, 0x00, 0x00, 0x00, // Id
-        0x03, 0x00, 0x61, 0x62, 0x63,                   // Uuid
-        0x01,                                           // Active
-        0x02, 0x00,                                     // Tags Count
-        0x02, 0x00, 0x67, 0x6F,                         // Tag 0 ("go")
-        0x04, 0x00, 0x72, 0x75, 0x73, 0x74,             // Tag 1 ("rust")
+        0x0F,
+        0xD2, 0x02, 0x96, 0x49, 0x00, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x61, 0x62, 0x63,
+        0x01,
+        0x02, 0x00,
+        0x02, 0x00, 0x67, 0x6F,
+        0x04, 0x00, 0x72, 0x75, 0x73, 0x74,
     ];
 
     if serialized != expected_bytes {
@@ -49,4 +68,12 @@ fn main() -> Result<(), &'static str> {
 
     println!("Rust E2E Verification: PASSED");
     Ok(())
+}
+
+fn main() -> Result<(), &'static str> {
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 2 {
+        return verify_golden(&args[1]);
+    }
+    e2e_roundtrip()
 }

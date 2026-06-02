@@ -67,9 +67,30 @@ Generated serializers enforce these limits at **marshal** time (overflow returns
 | `string`, `list`, `map` | `uint16` (2 bytes, LE) | **65,535** |
 | `bytes` | `uint32` (4 bytes, LE) | **4,294,967,295** |
 
-### Presence Semantics (Default = Absent)
+### Presence Semantics
 
-Fixed-size primitives and collections use **zero / empty** as “not on the wire”: `0`, `0.0`, `""`, empty `bytes`/`list`/`map`, and `false` for `bool` (when absent, unmarshaling leaves the zero value). Nested structs are **always** serialized (including an empty inner bitmap) so all languages produce the same bytes.
+**Implicit (default) fields** use zero / empty as “not on the wire”: `0`, `0.0`, `""`, empty `bytes`/`list`/`map`, and `false` for `bool`. You cannot transmit an explicit zero or false with these fields alone.
+
+**`optional` fields** use the bitmap only: when the bit is set, the value is written **including** zeros, `false`, and empty collections. In Go this maps to pointers (`*int32`, `*bool`, …); `nil` means absent.
+
+```protobuf
+struct Payload {
+    id: int64;              // implicit: 0 is omitted
+    score: optional int32;  // Some(0) is written as four zero bytes
+}
+```
+
+Non-optional nested structs are **always** serialized (empty inner bitmap included) so all languages agree on the wire layout.
+
+Go example (requires Go 1.26+ value `new`):
+
+```go
+p := Payload{
+    Id:    1,
+    Score: new(int32(0)), // present on the wire with value 0
+}
+buf, err := p.Marshal(nil)
+```
 
 ### Schema Guardian Type Aliases
 
@@ -131,7 +152,8 @@ task test:all
 task build          # asc.exe
 task codegen        # refresh test/testgen_* and language fixtures from .as files
 task test:unit      # parser + guardian
-task test:go        # Go integration, limits, nested struct, zero-copy
+task test:go        # Go integration, limits, nested struct, optional, zero-copy
+task test:golden    # same bytes decoded by Go, Python, Rust, TypeScript
 task test:rust      # Rust wire-format E2E (cargo run)
 task test:ts        # Deno: test.ts + test_limits.ts
 task test:py        # Python: test.py + test_limits.py + test_nested.py
@@ -147,6 +169,8 @@ go test -bench=Benchmark ./test/
 ```
 
 After changing `.as` schemas or codegen, run `task codegen` before committing generated sources under `test/`.
+
+Cross-language wire compatibility is checked against `test/golden/payload_v2.bin`: Go marshaling must match the file, and Python/Rust/TypeScript decoders must read the same bytes to identical field values.
 
 ### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers vs Apache Fory vs MessagePack vs Sonic)
 

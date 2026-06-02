@@ -197,8 +197,16 @@ func capitalize(s string) string {
 	return string(runes)
 }
 
-// toGoType converts an AST type to a Go type.
+// toGoType converts an AST type to a Go type (pointers for optional fields).
 func toGoType(t ast.FieldType) string {
+	base := toGoTypeValue(t)
+	if t.Optional {
+		return "*" + base
+	}
+	return base
+}
+
+func toGoTypeValue(t ast.FieldType) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -226,16 +234,26 @@ func toGoType(t ast.FieldType) string {
 	case ast.TypeStruct:
 		return t.Name
 	case ast.TypeList:
-		return "[]" + toGoType(*t.ElemType)
+		return "[]" + toGoTypeValue(*t.ElemType)
 	case ast.TypeMap:
-		return "map[" + toGoType(*t.KeyType) + "]" + toGoType(*t.ValType)
+		return "map[" + toGoTypeValue(*t.KeyType) + "]" + toGoTypeValue(*t.ValType)
 	default:
 		return ""
 	}
 }
 
-// genPresenceCheck generates a boolean expression checking if a field is present (non-zero).
+func derefExpr(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return "*" + expr
+	}
+	return expr
+}
+
+// genPresenceCheck generates a boolean expression checking if a field is present on the wire.
 func genPresenceCheck(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return expr + " != nil"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -259,6 +277,7 @@ func genPresenceCheck(expr string, t ast.FieldType) string {
 
 // genSerializeType recursively generates Go code for serializing a type.
 func genSerializeType(t ast.FieldType, expr string, depth int) string {
+	val := derefExpr(expr, t)
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -267,27 +286,27 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 	buf = append(buf, 1)
 } else {
 	buf = append(buf, 0)
-}`, expr)
+}`, val)
 		case "int32", "uint32":
 			return fmt.Sprintf(`{
 	v := uint32(%s)
 	buf = append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
-}`, expr)
+}`, val)
 		case "int64", "uint64":
 			return fmt.Sprintf(`{
 	v := uint64(%s)
 	buf = append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24), byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
-}`, expr)
+}`, val)
 		case "float32", "float":
 			return fmt.Sprintf(`{
 	v := math.Float32bits(%s)
 	buf = append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
-}`, expr)
+}`, val)
 		case "float64", "double":
 			return fmt.Sprintf(`{
 	v := math.Float64bits(%s)
 	buf = append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24), byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
-}`, expr)
+}`, val)
 		case "string":
 			return fmt.Sprintf(`{
 	length := len(%s)
@@ -296,7 +315,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 	}
 	buf = append(buf, byte(length), byte(length>>8))
 	buf = append(buf, %s...)
-}`, expr, codegen.MaxUint16, codegen.MaxUint16, expr)
+}`, val, codegen.MaxUint16, codegen.MaxUint16, val)
 		case "bytes":
 			return fmt.Sprintf(`{
 	length := len(%s)
@@ -305,7 +324,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 	}
 	buf = append(buf, byte(length), byte(length>>8), byte(length>>16), byte(length>>24))
 	buf = append(buf, %s...)
-}`, expr, expr)
+}`, val, val)
 		}
 	case ast.TypeStruct:
 		return fmt.Sprintf(`{
@@ -314,7 +333,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 	if err != nil {
 		return nil, err
 	}
-}`, expr)
+}`, val)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemCode := genSerializeType(*t.ElemType, elemName, depth+1)
@@ -327,7 +346,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 	for _, %s := range %s {
 %s
 	}
-}`, expr, codegen.MaxUint16, codegen.MaxUint16, elemName, expr, indent(elemCode, "\t\t"))
+}`, val, codegen.MaxUint16, codegen.MaxUint16, elemName, val, indent(elemCode, "\t\t"))
 	case ast.TypeMap:
 		keyName := fmt.Sprintf("k%d", depth)
 		valName := fmt.Sprintf("v%d", depth)
@@ -343,13 +362,38 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 %s
 %s
 	}
-}`, expr, codegen.MaxUint16, codegen.MaxUint16, keyName, valName, expr, indent(keyCode, "\t\t"), indent(valCode, "\t\t"))
+}`, val, codegen.MaxUint16, codegen.MaxUint16, keyName, valName, val, indent(keyCode, "\t\t"), indent(valCode, "\t\t"))
 	}
 	return ""
 }
 
 // genDeserializeType recursively generates Go code for deserializing a type.
 func genDeserializeType(t ast.FieldType, expr string, depth int) string {
+	if t.Optional {
+		return genDeserializeOptional(t, expr, depth)
+	}
+	return genDeserializeTypeValue(t, expr, depth)
+}
+
+func genDeserializeOptional(t ast.FieldType, expr string, depth int) string {
+	if t.Kind == ast.TypeStruct {
+		return fmt.Sprintf(`%s = &%s{}
+{
+	n, err := %s.Unmarshal(buf[offset:])
+	if err != nil {
+		return 0, err
+	}
+	offset += n
+}`, expr, t.Name, expr)
+	}
+	tmp := fmt.Sprintf("_opt%d", depth)
+	inner := t
+	inner.Optional = false
+	body := fmt.Sprintf("var %s %s\n%s", tmp, toGoTypeValue(inner), indent(genDeserializeTypeValue(inner, tmp, depth), "\t"))
+	return body + fmt.Sprintf("\n\t%s = &%s", expr, tmp)
+}
+
+func genDeserializeTypeValue(t ast.FieldType, expr string, depth int) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -448,7 +492,7 @@ offset += 8`, expr)
 }`, expr)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
-		elemTypeStr := toGoType(*t.ElemType)
+		elemTypeStr := toGoTypeValue(*t.ElemType)
 		elemCode := genDeserializeType(*t.ElemType, elemName, depth+1)
 		return fmt.Sprintf(`if offset+2 > len(buf) {
 	return 0, io.ErrUnexpectedEOF

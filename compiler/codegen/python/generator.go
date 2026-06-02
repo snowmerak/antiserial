@@ -103,6 +103,14 @@ import struct
 
 // toPyType maps an AST type to a Python type annotation.
 func toPyType(t ast.FieldType) string {
+	base := toPyTypeValue(t)
+	if t.Optional {
+		return base + " | None"
+	}
+	return base
+}
+
+func toPyTypeValue(t ast.FieldType) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -122,9 +130,9 @@ func toPyType(t ast.FieldType) string {
 	case ast.TypeStruct:
 		return fmt.Sprintf("'%s'", t.Name)
 	case ast.TypeList:
-		return fmt.Sprintf("list[%s]", toPyType(*t.ElemType))
+		return fmt.Sprintf("list[%s]", toPyTypeValue(*t.ElemType))
 	case ast.TypeMap:
-		return fmt.Sprintf("dict[%s, %s]", toPyType(*t.KeyType), toPyType(*t.ValType))
+		return fmt.Sprintf("dict[%s, %s]", toPyTypeValue(*t.KeyType), toPyTypeValue(*t.ValType))
 	default:
 		return "any"
 	}
@@ -132,6 +140,9 @@ func toPyType(t ast.FieldType) string {
 
 // defaultPyValue returns the default constructor value in Python.
 func defaultPyValue(t ast.FieldType) string {
+	if t.Optional {
+		return "None"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -147,7 +158,7 @@ func defaultPyValue(t ast.FieldType) string {
 			return "b''"
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf("%s()", t.Name)
+		return "None"
 	case ast.TypeList:
 		return "[]"
 	case ast.TypeMap:
@@ -158,6 +169,9 @@ func defaultPyValue(t ast.FieldType) string {
 
 // genPresenceCheck checks if a field is present in Python.
 func genPresenceCheck(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return expr + " is not None"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -212,7 +226,9 @@ buf.extend(len(%s).to_bytes(4, 'little'))
 buf.extend(%s)`, expr, expr, expr, expr)
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf("%s.serialize(buf)", expr)
+		return fmt.Sprintf(`if %s is None:
+    %s = %s()
+%s.serialize(buf)`, expr, expr, t.Name, expr)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemCode := genSerializeType(*t.ElemType, elemName, depth+1)
@@ -289,7 +305,9 @@ if offset + length > len(buf):
 offset += length`, expr)
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf(`offset = %s.deserialize(buf, offset)`, expr)
+		return fmt.Sprintf(`if %s is None:
+    %s = %s()
+offset = %s.deserialize(buf, offset)`, expr, expr, t.Name, expr)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemTypeStr := t.ElemType.Name

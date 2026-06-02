@@ -163,6 +163,14 @@ func hasLifetime(t ast.FieldType, schemaAST ast.AST, visited map[string]bool) bo
 
 // toRustType maps an AST type to a Rust type.
 func toRustType(t ast.FieldType, structLifetimes map[string]bool) string {
+	base := toRustTypeValue(t, structLifetimes)
+	if t.Optional {
+		return "Option<" + base + ">"
+	}
+	return base
+}
+
+func toRustTypeValue(t ast.FieldType, structLifetimes map[string]bool) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -194,9 +202,9 @@ func toRustType(t ast.FieldType, structLifetimes map[string]bool) string {
 		}
 		return t.Name + lt
 	case ast.TypeList:
-		return "Vec<" + toRustType(*t.ElemType, structLifetimes) + ">"
+		return "Vec<" + toRustTypeValue(*t.ElemType, structLifetimes) + ">"
 	case ast.TypeMap:
-		return "std::collections::HashMap<" + toRustType(*t.KeyType, structLifetimes) + ", " + toRustType(*t.ValType, structLifetimes) + ">"
+		return "std::collections::HashMap<" + toRustTypeValue(*t.KeyType, structLifetimes) + ", " + toRustTypeValue(*t.ValType, structLifetimes) + ">"
 	default:
 		return ""
 	}
@@ -204,6 +212,9 @@ func toRustType(t ast.FieldType, structLifetimes map[string]bool) string {
 
 // genPresenceCheck checks if a field is present in Rust.
 func genPresenceCheck(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return expr + ".is_some()"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -226,6 +237,12 @@ func genPresenceCheck(expr string, t ast.FieldType) string {
 
 // genSerializeType recursively generates Rust serialization code.
 func genSerializeType(t ast.FieldType, expr string, depth int) string {
+	if t.Optional {
+		inner := t
+		inner.Optional = false
+		body := genSerializeType(inner, "v", depth)
+		return fmt.Sprintf("if let Some(v) = &%s {\n%s\n}", expr, indent(body, "        "))
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -290,6 +307,16 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 
 // genDeserializeType recursively generates Rust deserialization code.
 func genDeserializeType(t ast.FieldType, expr string, structLifetimes map[string]bool, depth int) string {
+	if t.Optional {
+		if t.Kind == ast.TypeStruct {
+			return fmt.Sprintf("%s = Some(%s::deserialize(buf, offset)?);", expr, t.Name)
+		}
+		tmp := fmt.Sprintf("opt%d", depth)
+		inner := t
+		inner.Optional = false
+		body := genDeserializeType(inner, tmp, structLifetimes, depth)
+		return body + fmt.Sprintf("\n            %s = Some(%s);", expr, tmp)
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {

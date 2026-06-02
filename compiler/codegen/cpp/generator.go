@@ -20,6 +20,7 @@ func Generate(schemaAST ast.AST) (string, error) {
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <optional>
 
 `)
 
@@ -116,6 +117,14 @@ func Generate(schemaAST ast.AST) (string, error) {
 
 // toCppType maps an AST type to a C++ type.
 func toCppType(t ast.FieldType) string {
+	base := toCppTypeValue(t)
+	if t.Optional {
+		return "std::optional<" + base + ">"
+	}
+	return base
+}
+
+func toCppTypeValue(t ast.FieldType) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -143,9 +152,9 @@ func toCppType(t ast.FieldType) string {
 	case ast.TypeStruct:
 		return t.Name
 	case ast.TypeList:
-		return "std::vector<" + toCppType(*t.ElemType) + ">"
+		return "std::vector<" + toCppTypeValue(*t.ElemType) + ">"
 	case ast.TypeMap:
-		return "std::unordered_map<" + toCppType(*t.KeyType) + ", " + toCppType(*t.ValType) + ">"
+		return "std::unordered_map<" + toCppTypeValue(*t.KeyType) + ", " + toCppTypeValue(*t.ValType) + ">"
 	default:
 		return ""
 	}
@@ -153,6 +162,9 @@ func toCppType(t ast.FieldType) string {
 
 // genPresenceCheck checks if a field is present in C++.
 func genPresenceCheck(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return expr + ".has_value()"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -175,6 +187,12 @@ func genPresenceCheck(expr string, t ast.FieldType) string {
 
 // genSerializeType recursively generates C++ serialization code.
 func genSerializeType(t ast.FieldType, expr string, depth int) string {
+	if t.Optional {
+		inner := t
+		inner.Optional = false
+		body := genSerializeType(inner, "v", depth)
+		return fmt.Sprintf("if (%s.has_value()) {\n        const auto& v = %s.value();\n%s\n    }", expr, expr, indent(body, "        "))
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {

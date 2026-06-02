@@ -279,6 +279,14 @@ export class BufferReader {
 
 // toTsType maps an AST type to a TypeScript type.
 func toTsType(t ast.FieldType) string {
+	base := toTsTypeValue(t)
+	if t.Optional {
+		return base + " | null"
+	}
+	return base
+}
+
+func toTsTypeValue(t ast.FieldType) string {
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -298,9 +306,9 @@ func toTsType(t ast.FieldType) string {
 	case ast.TypeStruct:
 		return t.Name
 	case ast.TypeList:
-		return toTsType(*t.ElemType) + "[]"
+		return toTsTypeValue(*t.ElemType) + "[]"
 	case ast.TypeMap:
-		return "Map<" + toTsType(*t.KeyType) + ", " + toTsType(*t.ValType) + ">"
+		return "Map<" + toTsTypeValue(*t.KeyType) + ", " + toTsTypeValue(*t.ValType) + ">"
 	default:
 		return ""
 	}
@@ -308,6 +316,9 @@ func toTsType(t ast.FieldType) string {
 
 // defaultTsValue returns the default initializer string for a TS field.
 func defaultTsValue(t ast.FieldType) string {
+	if t.Optional {
+		return "null"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -334,6 +345,9 @@ func defaultTsValue(t ast.FieldType) string {
 
 // genPresenceCheck checks if a field is present in TS.
 func genPresenceCheck(expr string, t ast.FieldType) string {
+	if t.Optional {
+		return expr + " !== null"
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {
@@ -360,6 +374,12 @@ func genPresenceCheck(expr string, t ast.FieldType) string {
 
 // genSerializeType recursively generates TypeScript serialization code.
 func genSerializeType(t ast.FieldType, expr string, depth int) string {
+	if t.Optional {
+		inner := t
+		inner.Optional = false
+		body := genSerializeType(inner, "v", depth)
+		return fmt.Sprintf("if (%s !== null) {\n        const v = %s!;\n%s\n    }", expr, expr, indent(body, "        "))
+	}
 	switch t.Kind {
 	case ast.TypePrimitive:
 		switch t.Name {

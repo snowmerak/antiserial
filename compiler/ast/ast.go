@@ -30,22 +30,27 @@ func (k FieldTypeKind) String() string {
 
 // FieldType represents a type in the schema.
 type FieldType struct {
-	Kind      FieldTypeKind
-	Name      string     // "bool", "int32", "string", or struct name
-	ElemType  *FieldType // For list
-	KeyType   *FieldType // For map key
-	ValType   *FieldType // For map value
+	Kind     FieldTypeKind
+	Optional bool       // When true, bitmap controls presence; zero values are written when present
+	Name     string     // "bool", "int32", "string", or struct name
+	ElemType *FieldType // For list
+	KeyType  *FieldType // For map key
+	ValType  *FieldType // For map value
 }
 
 // String returns a human-readable representation of the type.
 func (t FieldType) String() string {
+	prefix := ""
+	if t.Optional {
+		prefix = "optional "
+	}
 	switch t.Kind {
 	case TypePrimitive, TypeStruct:
-		return t.Name
+		return prefix + t.Name
 	case TypeList:
-		return fmt.Sprintf("list<%s>", t.ElemType.String())
+		return prefix + fmt.Sprintf("list<%s>", t.ElemType.String())
 	case TypeMap:
-		return fmt.Sprintf("map<%s, %s>", t.KeyType.String(), t.ValType.String())
+		return prefix + fmt.Sprintf("map<%s, %s>", t.KeyType.String(), t.ValType.String())
 	default:
 		return "unknown"
 	}

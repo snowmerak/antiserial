@@ -124,6 +124,21 @@ func (p *Parser) Parse() (ast.AST, error) {
 
 // parseType parses field types including nested generics.
 func (p *Parser) parseType() (ast.FieldType, error) {
+	optional := false
+	if p.curr.Type == TokenKeywordOptional {
+		optional = true
+		p.advance()
+	}
+
+	ft, err := p.parseTypeCore()
+	if err != nil {
+		return ast.FieldType{}, err
+	}
+	ft.Optional = optional
+	return ft, nil
+}
+
+func (p *Parser) parseTypeCore() (ast.FieldType, error) {
 	switch p.curr.Type {
 	case TokenIdentifier:
 		name := p.curr.Value
@@ -140,7 +155,7 @@ func (p *Parser) parseType() (ast.FieldType, error) {
 		}
 		p.advance()
 
-		elemType, err := p.parseType()
+		elemType, err := p.parseTypeCore()
 		if err != nil {
 			return ast.FieldType{}, err
 		}
@@ -162,7 +177,7 @@ func (p *Parser) parseType() (ast.FieldType, error) {
 		}
 		p.advance()
 
-		keyType, err := p.parseType()
+		keyType, err := p.parseTypeCore()
 		if err != nil {
 			return ast.FieldType{}, err
 		}
@@ -172,7 +187,7 @@ func (p *Parser) parseType() (ast.FieldType, error) {
 		}
 		p.advance()
 
-		valType, err := p.parseType()
+		valType, err := p.parseTypeCore()
 		if err != nil {
 			return ast.FieldType{}, err
 		}
@@ -189,7 +204,7 @@ func (p *Parser) parseType() (ast.FieldType, error) {
 		}, nil
 
 	default:
-		return ast.FieldType{}, fmt.Errorf("line %d, col %d: expected type identifier, 'list', or 'map', got %q", p.curr.Line, p.curr.Col, p.curr.Value)
+		return ast.FieldType{}, fmt.Errorf("line %d, col %d: expected type identifier, 'optional', 'list', or 'map', got %q", p.curr.Line, p.curr.Col, p.curr.Value)
 	}
 }
 

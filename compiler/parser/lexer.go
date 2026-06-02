@@ -15,6 +15,7 @@ const (
 	TokenKeywordStruct
 	TokenKeywordList
 	TokenKeywordMap
+	TokenKeywordOptional
 	TokenLeftBrace
 	TokenRightBrace
 	TokenColon
@@ -39,6 +40,8 @@ func (t TokenType) String() string {
 		return "list"
 	case TokenKeywordMap:
 		return "map"
+	case TokenKeywordOptional:
+		return "optional"
 	case TokenLeftBrace:
 		return "{"
 	case TokenRightBrace:
@@ -130,6 +133,8 @@ func (l *Lexer) NextToken() Token {
 			tType = TokenKeywordList
 		case "map":
 			tType = TokenKeywordMap
+		case "optional":
+			tType = TokenKeywordOptional
 		}
 		return Token{Type: tType, Value: val, Line: line, Col: col}
 	}

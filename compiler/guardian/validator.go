@@ -19,6 +19,9 @@ func normalizePrimitiveName(name string) string {
 
 // TypesEqual returns true if two AST field types are structurally identical.
 func TypesEqual(t1, t2 ast.FieldType) bool {
+	if t1.Optional != t2.Optional {
+		return false
+	}
 	if t1.Kind != t2.Kind {
 		return false
 	}

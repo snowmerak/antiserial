@@ -13,6 +13,7 @@ tasks:
       - ./asc.exe --go_out=test/testgen_v1 test/schema_v1.as
       - ./asc.exe --go_out=test/testgen_v2 test/schema_v2.as
       - ./asc.exe --go_out=test/testgen_nested test/schema_nested.as
+      - ./asc.exe --go_out=test/testgen_optional test/schema_optional.as
       - ./asc.exe --rust_out=test/test_rust/src test/schema_v2.as
       - ./asc.exe --py_out=test/test_py test/schema_v2.as
       - ./asc.exe --py_out=test/test_py test/schema_nested.as
@@ -24,9 +25,13 @@ tasks:
       - go test -v ./compiler/parser ./compiler/guardian
 
   test:go:
-    desc: Run Go E2E integration and comparative benchmark tests
+    desc: Run Go E2E, golden cross-lang, limits, and benchmark tests
     cmds:
       - go test -v github.com/snowmerak/antiserial/test
+  test:golden:
+    desc: Run cross-language golden wire decode tests (Go, Python, Rust, Deno)
+    cmds:
+      - go test -v github.com/snowmerak/antiserial/test -run TestGolden
 
   test:rust:
     desc: Run Rust E2E verification test
