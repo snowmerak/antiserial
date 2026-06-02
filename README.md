@@ -104,19 +104,26 @@ go test ./test/...
 go test -bench=Benchmark ./test/
 ```
 
-### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers)
+### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers vs Apache Fory vs MessagePack vs Sonic)
 
-Benchmarks executed on Go 1.20+, arm64 system showing direct comparative performance:
+Benchmarks executed on Go 1.26+, arm64 system showing direct comparative performance:
 
 * **Marshal Performance**:
-  * **AntiSerial Marshal**: **18.54 ns/op** | **0 B/op** | **0 allocs/op** (10.0x faster than Protobuf, 11.2x faster than FlatBuffers, 15.2x faster than JSON)
-  * **Protobuf Marshal**: **185.20 ns/op** | **24 B/op** | **1 allocs/op**
-  * **FlatBuffers Marshal**: **207.40 ns/op** | **8 B/op** | **1 allocs/op**
-  * **JSON Marshal**: **282.60 ns/op** | **80 B/op** | **1 allocs/op**
+  * **AntiSerial Marshal**: **11.92 ns/op** | **0 B/op** | **0 allocs/op** (9.5x faster than Fory, 9.9x faster than Protobuf, 10.8x faster than FlatBuffers, 16.1x faster than JSON, 20.6x faster than MessagePack, 28.0x faster than Sonic)
+  * **Apache Fory Marshal**: **113.00 ns/op** | **0 B/op** | **0 allocs/op**
+  * **Protobuf Marshal**: **118.30 ns/op** | **24 B/op** | **1 allocs/op**
+  * **FlatBuffers Marshal**: **128.20 ns/op** | **8 B/op** | **1 allocs/op**
+  * **JSON Marshal**: **191.50 ns/op** | **80 B/op** | **1 allocs/op**
+  * **MessagePack Marshal**: **245.60 ns/op** | **136 B/op** | **3 allocs/op**
+  * **Bytedance Sonic Marshal**: **333.50 ns/op** | **98 B/op** | **2 allocs/op**
+
 * **Unmarshal Performance**:
-  * **AntiSerial Unmarshal**: **45.99 ns/op** | **32 B/op** | **1 allocs/op** (5.5x faster than Protobuf, 1.1x faster than FlatBuffers, 28.6x faster than JSON)
-  * **FlatBuffers Unmarshal**: **50.03 ns/op** | **0 B/op** | **0 allocs/op**
-  * **Protobuf Unmarshal**: **254.40 ns/op** | **60 B/op** | **5 allocs/op**
-  * **JSON Unmarshal**: **1315.00 ns/op** | **248 B/op** | **8 allocs/op**
+  * **AntiSerial Unmarshal**: **32.00 ns/op** | **32 B/op** | **1 allocs/op** (1.03x faster than FlatBuffers, 5.1x faster than Fory, 5.6x faster than Protobuf, 10.9x faster than MessagePack, 10.9x faster than Sonic, 28.1x faster than JSON)
+  * **FlatBuffers Unmarshal**: **32.87 ns/op** | **0 B/op** | **0 allocs/op**
+  * **Apache Fory Unmarshal**: **162.40 ns/op** | **44 B/op** | **4 allocs/op**
+  * **Protobuf Unmarshal**: **179.70 ns/op** | **60 B/op** | **5 allocs/op**
+  * **Bytedance Sonic Unmarshal**: **347.90 ns/op** | **232 B/op** | **3 allocs/op**
+  * **MessagePack Unmarshal**: **348.40 ns/op** | **60 B/op** | **4 allocs/op**
+  * **JSON Unmarshal**: **899.10 ns/op** | **248 B/op** | **8 allocs/op**
 
 

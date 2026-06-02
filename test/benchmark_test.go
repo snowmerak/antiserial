@@ -4,13 +4,25 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/apache/fory/go/fory"
+	"github.com/bytedance/sonic"
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/snowmerak/antiserial/test/testgen_fbs/fbs"
 	"github.com/snowmerak/antiserial/test/testgen_pb"
 	"github.com/snowmerak/antiserial/test/testgen_v1"
 	"github.com/snowmerak/antiserial/test/testgen_v2"
+	"github.com/vmihailenco/msgpack/v5"
 	"google.golang.org/protobuf/proto"
 )
+
+// Global Fory instance initialized once for the benchmark
+var foryInstance = func() *fory.Fory {
+	f := fory.New()
+	if err := f.RegisterStruct(testgen_v2.Payload{}, 1); err != nil {
+		panic(err)
+	}
+	return f
+}()
 
 // TestUnmarshalZeroAllocations verifies that unmarshaling a payload with no dynamic collections
 // causes exactly 0 heap allocations, demonstrating the effectiveness of unsafe string projections.
@@ -67,6 +79,108 @@ func BenchmarkAntiSerialUnmarshal(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_, _ = decoded.Unmarshal(serialized)
+	}
+}
+
+// === Apache Fory Benchmarks ===
+
+func BenchmarkForyMarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = foryInstance.Serialize(&p)
+	}
+}
+
+func BenchmarkForyUnmarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+	serialized, _ := foryInstance.Serialize(&p)
+	var decoded testgen_v2.Payload
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = foryInstance.Deserialize(serialized, &decoded)
+	}
+}
+
+// === MessagePack Benchmarks ===
+
+func BenchmarkMessagePackMarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = msgpack.Marshal(&p)
+	}
+}
+
+func BenchmarkMessagePackUnmarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+	serialized, _ := msgpack.Marshal(&p)
+	var decoded testgen_v2.Payload
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = msgpack.Unmarshal(serialized, &decoded)
+	}
+}
+
+// === Bytedance Sonic Benchmarks ===
+
+func BenchmarkSonicMarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = sonic.Marshal(&p)
+	}
+}
+
+func BenchmarkSonicUnmarshal(b *testing.B) {
+	p := testgen_v2.Payload{
+		Id:     1234567890,
+		Uuid:   "abc",
+		Active: true,
+		Tags:   []string{"go", "rust"},
+	}
+	serialized, _ := sonic.Marshal(&p)
+	var decoded testgen_v2.Payload
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = sonic.Unmarshal(serialized, &decoded)
 	}
 }
 
