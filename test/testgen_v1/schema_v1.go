@@ -2,6 +2,7 @@
 package testgen_v1
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"unsafe"
@@ -12,7 +13,7 @@ type Geo struct {
 	Lng float64 `json:"lng"`
 }
 
-func (s *Geo) Marshal(buf []byte) []byte {
+func (s *Geo) Marshal(buf []byte) ([]byte, error) {
 	f0Present := s.Lat != 0
 	f1Present := s.Lng != 0
 	var b0 byte
@@ -35,7 +36,7 @@ func (s *Geo) Marshal(buf []byte) []byte {
 			buf = append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24), byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
 		}
 	}
-	return buf
+	return buf, nil
 }
 
 func (s *Geo) Unmarshal(buf []byte) (int, error) {
@@ -92,7 +93,7 @@ type Payload struct {
 	Active bool   `json:"active"`
 }
 
-func (s *Payload) Marshal(buf []byte) []byte {
+func (s *Payload) Marshal(buf []byte) ([]byte, error) {
 	f0Present := s.Id != 0
 	f1Present := s.Uuid != ""
 	f2Present := s.Active
@@ -116,6 +117,9 @@ func (s *Payload) Marshal(buf []byte) []byte {
 	if f1Present {
 		{
 			length := len(s.Uuid)
+			if length > 65535 {
+				return nil, fmt.Errorf("antiserial: string length %d exceeds uint16 maximum 65535", length)
+			}
 			buf = append(buf, byte(length), byte(length>>8))
 			buf = append(buf, s.Uuid...)
 		}
@@ -127,7 +131,7 @@ func (s *Payload) Marshal(buf []byte) []byte {
 			buf = append(buf, 0)
 		}
 	}
-	return buf
+	return buf, nil
 }
 
 func (s *Payload) Unmarshal(buf []byte) (int, error) {

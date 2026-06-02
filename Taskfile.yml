@@ -6,6 +6,18 @@ tasks:
     cmds:
       - go build -o asc.exe ./cmd/asc
 
+  codegen:
+    desc: Regenerate checked-in test fixtures from .as schemas (requires build)
+    deps: [build]
+    cmds:
+      - ./asc.exe --go_out=test/testgen_v1 test/schema_v1.as
+      - ./asc.exe --go_out=test/testgen_v2 test/schema_v2.as
+      - ./asc.exe --go_out=test/testgen_nested test/schema_nested.as
+      - ./asc.exe --rust_out=test/test_rust/src test/schema_v2.as
+      - ./asc.exe --py_out=test/test_py test/schema_v2.as
+      - ./asc.exe --py_out=test/test_py test/schema_nested.as
+      - ./asc.exe --ts_out=test/test_ts test/schema_v2.as
+
   test:unit:
     desc: Run unit tests for parser and guardian
     cmds:
@@ -23,14 +35,17 @@ tasks:
       - cargo run
 
   test:ts:
-    desc: Run TypeScript E2E verification test via Deno
+    desc: Run TypeScript E2E verification tests via Deno
     cmds:
       - deno run test/test_ts/test.ts
+      - deno run test/test_ts/test_limits.ts
 
   test:py:
-    desc: Run Python E2E verification test
+    desc: Run Python E2E verification tests
     cmds:
       - python test/test_py/test.py
+      - python test/test_py/test_limits.py
+      - python test/test_py/test_nested.py
 
   test:all:
     desc: Run all unit and E2E multi-language verification tests

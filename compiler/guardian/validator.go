@@ -5,13 +5,27 @@ import (
 	"github.com/snowmerak/antiserial/compiler/ast"
 )
 
+// normalizePrimitiveName maps wire-compatible primitive aliases to a canonical name.
+func normalizePrimitiveName(name string) string {
+	switch name {
+	case "float":
+		return "float32"
+	case "double":
+		return "float64"
+	default:
+		return name
+	}
+}
+
 // TypesEqual returns true if two AST field types are structurally identical.
 func TypesEqual(t1, t2 ast.FieldType) bool {
 	if t1.Kind != t2.Kind {
 		return false
 	}
 	switch t1.Kind {
-	case ast.TypePrimitive, ast.TypeStruct:
+	case ast.TypePrimitive:
+		return normalizePrimitiveName(t1.Name) == normalizePrimitiveName(t2.Name)
+	case ast.TypeStruct:
 		return t1.Name == t2.Name
 	case ast.TypeList:
 		if t1.ElemType == nil || t2.ElemType == nil {

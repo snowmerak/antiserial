@@ -32,7 +32,10 @@ func TestUnmarshalZeroAllocations(t *testing.T) {
 		Uuid:   "abc",
 		Active: true,
 	}
-	serialized := p.Marshal(nil)
+	serialized, err := p.Marshal(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var decoded testgen_v1.Payload
 	allocs := testing.AllocsPerRun(1000, func() {
@@ -61,7 +64,7 @@ func BenchmarkAntiSerialMarshal(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = p.Marshal(buf[:0])
+		_, _ = p.Marshal(buf[:0])
 	}
 }
 
@@ -72,7 +75,10 @@ func BenchmarkAntiSerialUnmarshal(b *testing.B) {
 		Active: true,
 		Tags:   []string{"go", "rust"},
 	}
-	serialized := p.Marshal(nil)
+	serialized, err := p.Marshal(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 	var decoded testgen_v2.Payload
 
 	b.ResetTimer()

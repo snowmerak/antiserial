@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/snowmerak/antiserial/compiler/ast"
+	"github.com/snowmerak/antiserial/compiler/codegen"
 )
 
 // Generate translates the AST into safe, high-performance, zero-copy Rust source code.
@@ -43,7 +44,7 @@ use std::convert::TryInto;
 		buf.WriteString(fmt.Sprintf("\nimpl%s %s%s {\n", lifetimeStr, s.Name, lifetimeStr))
 
 		// Serialize Method
-		buf.WriteString("    pub fn serialize(&self, buf: &mut Vec<u8>) {\n")
+		buf.WriteString("    pub fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), &'static str> {\n")
 		// Check presence variables
 		for i, field := range s.Fields {
 			presenceExpr := genPresenceCheck("self."+field.Name, field.Type)
@@ -79,7 +80,7 @@ use std::convert::TryInto;
 			buf.WriteString(indent(serializeCode, "            "))
 			buf.WriteString("\n        }\n")
 		}
-		buf.WriteString("    }\n")
+		buf.WriteString("        Ok(())\n    }\n")
 
 		// Deserialize Method
 		methodLifetime := ""
@@ -235,42 +236,54 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 		case "string":
 			return fmt.Sprintf(`{
     let bytes = %s.as_bytes();
+    if bytes.len() > %d {
+        return Err("string length exceeds uint16 maximum");
+    }
     let length = bytes.len() as u16;
     buf.extend_from_slice(&length.to_le_bytes());
     buf.extend_from_slice(bytes);
-}`, expr)
+}`, expr, codegen.MaxUint16)
 		case "bytes":
 			return fmt.Sprintf(`{
+    if %s.len() > u32::MAX as usize {
+        return Err("bytes length exceeds uint32 maximum");
+    }
     let length = %s.len() as u32;
     buf.extend_from_slice(&length.to_le_bytes());
     buf.extend_from_slice(%s);
-}`, expr, expr)
+}`, expr, expr, expr)
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf("%s.serialize(buf);", expr)
+		return fmt.Sprintf("%s.serialize(buf)?;", expr)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemCode := genSerializeType(*t.ElemType, "(*"+elemName+")", depth+1)
 		return fmt.Sprintf(`{
+    if %s.len() > %d {
+        return Err("list length exceeds uint16 maximum");
+    }
     let count = %s.len() as u16;
     buf.extend_from_slice(&count.to_le_bytes());
     for %s in &%s {
 %s
     }
-}`, expr, elemName, expr, indent(elemCode, "        "))
+}`, expr, codegen.MaxUint16, expr, elemName, expr, indent(elemCode, "        "))
 	case ast.TypeMap:
 		keyName := fmt.Sprintf("k%d", depth)
 		valName := fmt.Sprintf("v%d", depth)
 		keyCode := genSerializeType(*t.KeyType, "(*"+keyName+")", depth+1)
 		valCode := genSerializeType(*t.ValType, "(*"+valName+")", depth+1)
 		return fmt.Sprintf(`{
+    if %s.len() > %d {
+        return Err("map length exceeds uint16 maximum");
+    }
     let count = %s.len() as u16;
     buf.extend_from_slice(&count.to_le_bytes());
     for (%s, %s) in &%s {
 %s
 %s
     }
-}`, expr, keyName, valName, expr, indent(keyCode, "        "), indent(valCode, "        "))
+}`, expr, codegen.MaxUint16, expr, keyName, valName, expr, indent(keyCode, "        "), indent(valCode, "        "))
 	}
 	return ""
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/snowmerak/antiserial/compiler/ast"
+	"github.com/snowmerak/antiserial/compiler/codegen"
 )
 
 // Generate translates the AST into safe, high-performance Python source code.
@@ -146,7 +147,7 @@ func defaultPyValue(t ast.FieldType) string {
 			return "b''"
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf("None") // Initialized lazily to avoid infinite recursion on circular structs
+		return fmt.Sprintf("%s()", t.Name)
 	case ast.TypeList:
 		return "[]"
 	case ast.TypeMap:
@@ -172,7 +173,7 @@ func genPresenceCheck(expr string, t ast.FieldType) string {
 			return "len(" + expr + ") > 0"
 		}
 	case ast.TypeStruct:
-		return expr + " is not None"
+		return "True"
 	case ast.TypeList, ast.TypeMap:
 		return "len(" + expr + ") > 0"
 	}
@@ -200,11 +201,15 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 			return fmt.Sprintf("buf.extend(struct.pack('<d', %s))", expr)
 		case "string":
 			return fmt.Sprintf(`encoded = %s.encode('utf-8')
+if len(encoded) > %d:
+    raise ValueError(f"string length {len(encoded)} exceeds uint16 maximum %d")
 buf.extend(len(encoded).to_bytes(2, 'little'))
-buf.extend(encoded)`, expr)
+buf.extend(encoded)`, expr, codegen.MaxUint16, codegen.MaxUint16)
 		case "bytes":
-			return fmt.Sprintf(`buf.extend(len(%s).to_bytes(4, 'little'))
-buf.extend(%s)`, expr, expr)
+			return fmt.Sprintf(`if len(%s) > 0xFFFFFFFF:
+    raise ValueError(f"bytes length {len(%s)} exceeds uint32 maximum")
+buf.extend(len(%s).to_bytes(4, 'little'))
+buf.extend(%s)`, expr, expr, expr, expr)
 		}
 	case ast.TypeStruct:
 		return fmt.Sprintf("%s.serialize(buf)", expr)
@@ -212,19 +217,23 @@ buf.extend(%s)`, expr, expr)
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemCode := genSerializeType(*t.ElemType, elemName, depth+1)
 		return fmt.Sprintf(`count = len(%s)
+if count > %d:
+    raise ValueError(f"list length {count} exceeds uint16 maximum %d")
 buf.extend(count.to_bytes(2, 'little'))
 for %s in %s:
-%s`, expr, elemName, expr, indent(elemCode, "    "))
+%s`, expr, codegen.MaxUint16, codegen.MaxUint16, elemName, expr, indent(elemCode, "    "))
 	case ast.TypeMap:
 		keyName := fmt.Sprintf("k%d", depth)
 		valName := fmt.Sprintf("v%d", depth)
 		keyCode := genSerializeType(*t.KeyType, keyName, depth+1)
 		valCode := genSerializeType(*t.ValType, valName, depth+1)
 		return fmt.Sprintf(`count = len(%s)
+if count > %d:
+    raise ValueError(f"map length {count} exceeds uint16 maximum %d")
 buf.extend(count.to_bytes(2, 'little'))
 for %s, %s in %s.items():
 %s
-%s`, expr, keyName, valName, expr, indent(keyCode, "    "), indent(valCode, "    "))
+%s`, expr, codegen.MaxUint16, codegen.MaxUint16, keyName, valName, expr, indent(keyCode, "    "), indent(valCode, "    "))
 	}
 	return ""
 }
@@ -280,9 +289,7 @@ if offset + length > len(buf):
 offset += length`, expr)
 		}
 	case ast.TypeStruct:
-		return fmt.Sprintf(`if %s is None:
-    %s = %s()
-offset = %s.deserialize(buf, offset)`, expr, expr, t.Name, expr)
+		return fmt.Sprintf(`offset = %s.deserialize(buf, offset)`, expr)
 	case ast.TypeList:
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemTypeStr := t.ElemType.Name

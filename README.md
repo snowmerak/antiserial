@@ -58,6 +58,23 @@ struct ComplexPayload {
 | **list\<T\>** | `[]T` | `Vec<T>` | `std::vector<T>` | `T[]` | `list[T]` | 2 (len) + variable |
 | **map\<K,V\>** | `map[K]V` | `HashMap<K, V>` | `std::unordered_map<K, V>` | `Map<K, V>` | `dict[K, V]` | 2 (len) + variable |
 
+### Wire Size Limits
+
+Generated serializers enforce these limits at **marshal** time (overflow returns an error instead of truncating):
+
+| Field kind | Length prefix | Maximum |
+| :--- | :---: | :---: |
+| `string`, `list`, `map` | `uint16` (2 bytes, LE) | **65,535** |
+| `bytes` | `uint32` (4 bytes, LE) | **4,294,967,295** |
+
+### Presence Semantics (Default = Absent)
+
+Fixed-size primitives and collections use **zero / empty** as “not on the wire”: `0`, `0.0`, `""`, empty `bytes`/`list`/`map`, and `false` for `bool` (when absent, unmarshaling leaves the zero value). Nested structs are **always** serialized (including an empty inner bitmap) so all languages produce the same bytes.
+
+### Schema Guardian Type Aliases
+
+Backward-compatibility checks treat wire-equivalent primitive aliases as the same type: `float` ↔ `float32`, `double` ↔ `float64`.
+
 ---
 
 ## Compiler Usage (`asc`)
@@ -89,22 +106,47 @@ To guarantee schema safety before deploying in a CI/CD pipeline:
 asc --base_schema=schema.base.as --validate_only schema.as
 ```
 
+### Generated Go API
+
+Go structs expose:
+
+```go
+func (s *Payload) Marshal(buf []byte) ([]byte, error)
+func (s *Payload) Unmarshal(buf []byte) (int, error)
+```
+
+`Marshal` appends to `buf` (pass `nil` to allocate) and returns an error if any `string`/`list`/`map` length exceeds 65,535 or `bytes` exceeds the `uint32` limit.
+
 ---
 
 ## Verification and Testing
 
-To run the parser, validator, and Go integration/zero-copy tests:
+This repo uses [Task](https://taskfile.dev). Install Task, then from the repository root:
 
 ```bash
-# Run unit tests
+# Build asc and run all unit + multi-language E2E tests
+task test:all
+
+# Individual targets
+task build          # asc.exe
+task codegen        # refresh test/testgen_* and language fixtures from .as files
+task test:unit      # parser + guardian
+task test:go        # Go integration, limits, nested struct, zero-copy
+task test:rust      # Rust wire-format E2E (cargo run)
+task test:ts        # Deno: test.ts + test_limits.ts
+task test:py        # Python: test.py + test_limits.py + test_nested.py
+task bench          # comparative benchmarks (in test/)
+```
+
+Equivalent raw commands:
+
+```bash
 go test ./compiler/...
-
-# Run end-to-end integration tests
-go test ./test/...
-
-# Run benchmark suite
+go test -v github.com/snowmerak/antiserial/test
 go test -bench=Benchmark ./test/
 ```
+
+After changing `.as` schemas or codegen, run `task codegen` before committing generated sources under `test/`.
 
 ### Benchmark Comparison (AntiSerial vs JSON vs Protobuf vs FlatBuffers vs Apache Fory vs MessagePack vs Sonic)
 

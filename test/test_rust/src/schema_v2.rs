@@ -8,7 +8,7 @@ pub struct Geo {
 }
 
 impl Geo {
-    pub fn serialize(&self, buf: &mut Vec<u8>) {
+    pub fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), &'static str> {
         let f0_present = self.lat != 0.0;
         let f1_present = self.lng != 0.0;
         let mut b0: u8 = 0;
@@ -25,6 +25,7 @@ impl Geo {
         if f1_present {
             buf.extend_from_slice(&self.lng.to_le_bytes());
         }
+        Ok(())
     }
     pub fn deserialize<'a>(buf: &'a [u8], offset: &mut usize) -> Result<Self, &'static str> {
         let bitmap_start = *offset;
@@ -79,7 +80,7 @@ pub struct Payload<'a> {
 }
 
 impl<'a> Payload<'a> {
-    pub fn serialize(&self, buf: &mut Vec<u8>) {
+    pub fn serialize(&self, buf: &mut Vec<u8>) -> Result<(), &'static str> {
         let f0_present = self.id != 0;
         let f1_present = !self.uuid.is_empty();
         let f2_present = self.active;
@@ -104,6 +105,9 @@ impl<'a> Payload<'a> {
         if f1_present {
             {
                 let bytes = self.uuid.as_bytes();
+                if bytes.len() > 65535 {
+                    return Err("string length exceeds uint16 maximum");
+                }
                 let length = bytes.len() as u16;
                 buf.extend_from_slice(&length.to_le_bytes());
                 buf.extend_from_slice(bytes);
@@ -114,11 +118,17 @@ impl<'a> Payload<'a> {
         }
         if f3_present {
             {
+                if self.tags.len() > 65535 {
+                    return Err("list length exceeds uint16 maximum");
+                }
                 let count = self.tags.len() as u16;
                 buf.extend_from_slice(&count.to_le_bytes());
                 for elem0 in &self.tags {
                     {
                         let bytes = (*elem0).as_bytes();
+                        if bytes.len() > 65535 {
+                            return Err("string length exceeds uint16 maximum");
+                        }
                         let length = bytes.len() as u16;
                         buf.extend_from_slice(&length.to_le_bytes());
                         buf.extend_from_slice(bytes);
@@ -126,6 +136,7 @@ impl<'a> Payload<'a> {
                 }
             }
         }
+        Ok(())
     }
     pub fn deserialize(buf: &'a [u8], offset: &mut usize) -> Result<Self, &'static str> {
         let bitmap_start = *offset;

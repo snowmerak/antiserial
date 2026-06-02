@@ -18,7 +18,10 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// 2. Marshal using version 2 code
-	serialized := p2.Marshal(nil)
+	serialized, err := p2.Marshal(nil)
+	if err != nil {
+		t.Fatalf("v2 Marshal failed: %v", err)
+	}
 
 	// Verify expected binary layout:
 	// - Bitmap (1 byte): 0x0F (fields 0, 1, 2, 3 present, MSB 0)
@@ -90,7 +93,10 @@ func TestGeoStruct(t *testing.T) {
 		Lat: 37.7749,
 		Lng: -122.4194,
 	}
-	serialized := g.Marshal(nil)
+	serialized, err := g.Marshal(nil)
+	if err != nil {
+		t.Fatalf("Geo Marshal failed: %v", err)
+	}
 
 	// Expected size of Geo struct:
 	// - Bitmap (1 byte): 0x03 (lat, lng present)
@@ -102,7 +108,7 @@ func TestGeoStruct(t *testing.T) {
 	}
 
 	var decoded testgen_v2.Geo
-	_, err := decoded.Unmarshal(serialized)
+	_, err = decoded.Unmarshal(serialized)
 	if err != nil {
 		t.Fatalf("Geo unmarshal failed: %v", err)
 	}

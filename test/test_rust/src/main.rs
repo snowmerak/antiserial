@@ -10,7 +10,7 @@ fn main() -> Result<(), &'static str> {
     p.tags = vec!["go", "rust"];
 
     let mut serialized = Vec::new();
-    p.serialize(&mut serialized);
+    p.serialize(&mut serialized)?;
 
     let expected_bytes = vec![
         0x0F,                                           // Bitmap

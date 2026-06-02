@@ -52,49 +52,24 @@ class Geo:
             offset += 8
         return offset
 
-class Payload:
+class WithGeo:
     def __init__(self):
         self.id: int = 0
-        self.uuid: str = ""
-        self.active: bool = False
-        self.tags: list[str] = []
+        self.geo: 'Geo' = Geo()
 
     def serialize(self, buf: bytearray):
         f0_present = self.id != 0
-        f1_present = self.uuid != ""
-        f2_present = self.active
-        f3_present = len(self.tags) > 0
+        f1_present = True
         b0 = 0
         if f0_present:
             b0 |= 1 << 0
         if f1_present:
             b0 |= 1 << 1
-        if f2_present:
-            b0 |= 1 << 2
-        if f3_present:
-            b0 |= 1 << 3
         buf.append(b0)
         if f0_present:
             buf.extend(struct.pack('<q', self.id))
         if f1_present:
-            encoded = self.uuid.encode('utf-8')
-            if len(encoded) > 65535:
-                raise ValueError(f"string length {len(encoded)} exceeds uint16 maximum 65535")
-            buf.extend(len(encoded).to_bytes(2, 'little'))
-            buf.extend(encoded)
-        if f2_present:
-            buf.append(1 if self.active else 0)
-        if f3_present:
-            count = len(self.tags)
-            if count > 65535:
-                raise ValueError(f"list length {count} exceeds uint16 maximum 65535")
-            buf.extend(count.to_bytes(2, 'little'))
-            for elem0 in self.tags:
-                encoded = elem0.encode('utf-8')
-                if len(encoded) > 65535:
-                    raise ValueError(f"string length {len(encoded)} exceeds uint16 maximum 65535")
-                buf.extend(len(encoded).to_bytes(2, 'little'))
-                buf.extend(encoded)
+            self.geo.serialize(buf)
 
     def deserialize(self, buf: bytes, offset: int) -> int:
         bitmap_start = offset
@@ -122,36 +97,5 @@ class Payload:
             offset += 8
 
         if is_present(1):
-            if offset + 2 > len(buf):
-                raise ValueError("Unexpected EOF")
-            length = int.from_bytes(buf[offset:offset+2], 'little')
-            offset += 2
-            if offset + length > len(buf):
-                raise ValueError("Unexpected EOF")
-            self.uuid = buf[offset:offset+length].decode('utf-8')
-            offset += length
-
-        if is_present(2):
-            if offset >= len(buf):
-                raise ValueError("Unexpected EOF")
-            self.active = buf[offset] != 0
-            offset += 1
-
-        if is_present(3):
-            if offset + 2 > len(buf):
-                raise ValueError("Unexpected EOF")
-            count = int.from_bytes(buf[offset:offset+2], 'little')
-            offset += 2
-            self.tags = []
-            for _ in range(count):
-                elem0 = ""
-                if offset + 2 > len(buf):
-                    raise ValueError("Unexpected EOF")
-                length = int.from_bytes(buf[offset:offset+2], 'little')
-                offset += 2
-                if offset + length > len(buf):
-                    raise ValueError("Unexpected EOF")
-                elem0 = buf[offset:offset+length].decode('utf-8')
-                offset += length
-                self.tags.append(elem0)
+            offset = self.geo.deserialize(buf, offset)
         return offset

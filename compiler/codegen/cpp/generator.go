@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/snowmerak/antiserial/compiler/ast"
+	"github.com/snowmerak/antiserial/compiler/codegen"
 )
 
 // Generate translates the AST into a high-performance, header-only C++ library.
@@ -192,6 +193,9 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 }`, cppType, expr, cppType, cppType)
 		case "string":
 			return fmt.Sprintf(`{
+    if (%s.size() > %d) {
+        throw std::runtime_error("string length exceeds uint16 maximum");
+    }
     uint16_t length = static_cast<uint16_t>(%s.size());
     size_t start = buf.size();
     buf.resize(start + 2 + length);
@@ -199,9 +203,12 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
     if (length > 0) {
         std::memcpy(&buf[start + 2], %s.data(), length);
     }
-}`, expr, expr)
+}`, expr, codegen.MaxUint16, expr, expr)
 		case "bytes":
 			return fmt.Sprintf(`{
+    if (%s.size() > UINT32_MAX) {
+        throw std::runtime_error("bytes length exceeds uint32 maximum");
+    }
     uint32_t length = static_cast<uint32_t>(%s.size());
     size_t start = buf.size();
     buf.resize(start + 4 + length);
@@ -209,7 +216,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
     if (length > 0) {
         std::memcpy(&buf[start + 4], %s.data(), length);
     }
-}`, expr, expr)
+}`, expr, expr, expr)
 		}
 	case ast.TypeStruct:
 		return fmt.Sprintf("%s.serialize(buf);", expr)
@@ -217,6 +224,9 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 		elemName := fmt.Sprintf("elem%d", depth)
 		elemCode := genSerializeType(*t.ElemType, elemName, depth+1)
 		return fmt.Sprintf(`{
+    if (%s.size() > %d) {
+        throw std::runtime_error("list length exceeds uint16 maximum");
+    }
     uint16_t count = static_cast<uint16_t>(%s.size());
     size_t start = buf.size();
     buf.resize(start + 2);
@@ -224,13 +234,16 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
     for (const auto& %s : %s) {
 %s
     }
-}`, expr, elemName, expr, indent(elemCode, "        "))
+}`, expr, codegen.MaxUint16, expr, elemName, expr, indent(elemCode, "        "))
 	case ast.TypeMap:
 		keyName := fmt.Sprintf("k%d", depth)
 		valName := fmt.Sprintf("v%d", depth)
 		keyCode := genSerializeType(*t.KeyType, keyName, depth+1)
 		valCode := genSerializeType(*t.ValType, valName, depth+1)
 		return fmt.Sprintf(`{
+    if (%s.size() > %d) {
+        throw std::runtime_error("map length exceeds uint16 maximum");
+    }
     uint16_t count = static_cast<uint16_t>(%s.size());
     size_t start = buf.size();
     buf.resize(start + 2);
@@ -239,7 +252,7 @@ func genSerializeType(t ast.FieldType, expr string, depth int) string {
 %s
 %s
     }
-}`, expr, keyName, valName, expr, indent(keyCode, "        "), indent(valCode, "        "))
+}`, expr, codegen.MaxUint16, expr, keyName, valName, expr, indent(keyCode, "        "), indent(valCode, "        "))
 	}
 	return ""
 }
