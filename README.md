@@ -44,19 +44,19 @@ struct ComplexPayload {
 
 ### Type Mapping
 
-| AntiSerial Type | Go Type | Rust Type | C++ Type | Size (Bytes) |
-| :--- | :--- | :--- | :--- | :---: |
-| **bool** | `bool` | `bool` | `bool` | 1 |
-| **int32** | `int32` | `i32` | `int32_t` | 4 |
-| **uint32** | `uint32` | `u32` | `uint32_t` | 4 |
-| **int64** | `int64` | `i64` | `int64_t` | 8 |
-| **uint64** | `uint64` | `u64` | `uint64_t` | 8 |
-| **float32 / float** | `float32` | `f32` | `float` | 4 |
-| **float64 / double**| `float64` | `f64` | `double` | 8 |
-| **string** | `string` | `&'a str` | `std::string_view` | 2 (len) + variable |
-| **bytes** | `[]byte` | `&'a [u8]` | `std::span<const uint8_t>` | 4 (len) + variable |
-| **list\<T\>** | `[]T` | `Vec<T>` | `std::vector<T>` | 2 (len) + variable |
-| **map\<K,V\>** | `map[K]V` | `HashMap<K, V>` | `std::unordered_map<K, V>`| 2 (len) + variable |
+| AntiSerial Type | Go Type | Rust Type | C++ Type | TS Type | Python Type | Size (Bytes) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---: |
+| **bool** | `bool` | `bool` | `bool` | `boolean` | `bool` | 1 |
+| **int32** | `int32` | `i32` | `int32_t` | `number` | `int` | 4 |
+| **uint32** | `uint32` | `u32` | `uint32_t` | `number` | `int` | 4 |
+| **int64** | `int64` | `i64` | `int64_t` | `bigint` | `int` | 8 |
+| **uint64** | `uint64` | `u64` | `uint64_t` | `bigint` | `int` | 8 |
+| **float32 / float** | `float32` | `f32` | `float` | `number` | `float` | 4 |
+| **float64 / double**| `float64` | `f64` | `double` | `number` | `float` | 8 |
+| **string** | `string` | `&'a str` | `std::string_view` | `string` | `str` | 2 (len) + variable |
+| **bytes** | `[]byte` | `&'a [u8]` | `std::span<const uint8_t>` | `Uint8Array` | `bytes` | 4 (len) + variable |
+| **list\<T\>** | `[]T` | `Vec<T>` | `std::vector<T>` | `T[]` | `list[T]` | 2 (len) + variable |
+| **map\<K,V\>** | `map[K]V` | `HashMap<K, V>` | `std::unordered_map<K, V>` | `Map<K, V>` | `dict[K, V]` | 2 (len) + variable |
 
 ---
 
