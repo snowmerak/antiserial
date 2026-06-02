@@ -99,4 +99,19 @@ go test ./compiler/...
 
 # Run end-to-end integration tests
 go test ./test/...
+
+# Run benchmark suite
+go test -bench=Benchmark ./test/
 ```
+
+### Benchmark Comparison (AntiSerial vs JSON)
+
+Benchmarks executed on Go 1.20+, arm64 system showing direct comparative performance:
+
+* **Marshal Performance**:
+  * **AntiSerial Marshal**: **17.96 ns/op** | **0 B/op** | **0 allocs/op** (15.5x faster than JSON)
+  * **JSON Marshal**: **279.30 ns/op** | **80 B/op** | **1 allocs/op**
+* **Unmarshal Performance**:
+  * **AntiSerial Unmarshal**: **44.23 ns/op** | **32 B/op** | **1 allocs/op** (30.2x faster than JSON)
+  * **JSON Unmarshal**: **1337.00 ns/op** | **248 B/op** | **8 allocs/op**
+

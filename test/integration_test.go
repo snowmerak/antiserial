@@ -84,3 +84,30 @@ func TestEndToEnd(t *testing.T) {
 		t.Errorf("v1 backward compatible fields mismatch. Got %+v, Want %+v", decoded1, p2)
 	}
 }
+
+func TestGeoStruct(t *testing.T) {
+	g := testgen_v2.Geo{
+		Lat: 37.7749,
+		Lng: -122.4194,
+	}
+	serialized := g.Marshal(nil)
+
+	// Expected size of Geo struct:
+	// - Bitmap (1 byte): 0x03 (lat, lng present)
+	// - Lat (8 bytes): float64
+	// - Lng (8 bytes): float64
+	// Total: 17 bytes
+	if len(serialized) != 17 {
+		t.Errorf("expected Geo serialized length to be 17, got %d", len(serialized))
+	}
+
+	var decoded testgen_v2.Geo
+	_, err := decoded.Unmarshal(serialized)
+	if err != nil {
+		t.Fatalf("Geo unmarshal failed: %v", err)
+	}
+
+	if decoded.Lat != g.Lat || decoded.Lng != g.Lng {
+		t.Errorf("Geo mismatch. Got %+v, Want %+v", decoded, g)
+	}
+}
